@@ -40,11 +40,15 @@ struct MinecraftLaunchCommand {
 
     private func validatePlayerTokenBeforeLaunch() async throws -> Player {
         if let profile = OfflineUserServerMap.serverKey(for: player.id),
-           let server = YggdrasilServerPresets.server(for: profile.serverBaseURL) {
-            await DIContainer.shared.system.yggdrasilAuthService.refreshThirdPartyToken(
+           let server = YggdrasilServerRegistry.server(for: profile.serverBaseURL) {
+            // Persist refreshed credentials so later launch command construction reads the new tokens.
+            let refreshed = try await DIContainer.shared.system.yggdrasilAuthService.refreshThirdPartyToken(
                 profile: profile,
                 server: server,
             )
+            if refreshed.accessToken != profile.accessToken {
+                AppLog.game.info("Refreshed third-party token for player \(player.name)")
+            }
         }
         guard player.isOnlineAccount else {
             return player
@@ -129,7 +133,7 @@ struct MinecraftLaunchCommand {
         profile: YggdrasilProfile?,
     ) async throws -> String {
         guard let profile,
-              let server = YggdrasilServerPresets.server(for: profile.serverBaseURL) else {
+              let server = YggdrasilServerRegistry.server(for: profile.serverBaseURL) else {
             return player.authAccessToken
         }
 

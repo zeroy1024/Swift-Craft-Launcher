@@ -84,7 +84,10 @@ struct AddPlayerToolbarButton: View {
                 },
                 onLogin: { profile in
                     AppLog.main.debug("Premium login successful, user: \(profile.name)")
-                    _ = playerListViewModel.addOnlinePlayer(profile: profile)
+                    guard playerListViewModel.addOnlinePlayer(profile: profile) else {
+                        OfflineUserServerMap.removeServer(for: profile.id)
+                        return
+                    }
                     container.system.premiumAccountFlagManager.setPremiumAccountAdded()
                     delayedDismiss($showSheet) {
                         container.system.minecraftAuthService.clearAuthenticationData()
@@ -92,8 +95,20 @@ struct AddPlayerToolbarButton: View {
                 },
                 onYggdrasilLogin: { profile in
                     AppLog.main.debug("Yggdrasil login successful, user: \(profile.name)")
-                    OfflineUserServerMap.setServer(profile)
-                    _ = playerListViewModel.addOnlinePlayer(profile: profile)
+                    guard OfflineUserServerMap.setServer(profile) else {
+                        container.core.errorHandler.handle(
+                            GlobalError.authentication(
+                                i18nKey: "error.authentication.reauth_required",
+                                level: .popup,
+                                message: "Failed to persist third-party credential for \(profile.id)",
+                            ),
+                        )
+                        return
+                    }
+                    guard playerListViewModel.addOnlinePlayer(profile: profile) else {
+                        OfflineUserServerMap.removeServer(for: profile.id)
+                        return
+                    }
                     delayedDismiss($showSheet) {
                         container.system.yggdrasilAuthService.logout()
                     }

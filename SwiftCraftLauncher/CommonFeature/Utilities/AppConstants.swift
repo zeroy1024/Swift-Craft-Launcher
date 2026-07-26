@@ -30,6 +30,7 @@ enum AppConstants {
         static let enableMinecraftFriendsPresenceNotifications = "enableMinecraftFriendsPresenceNotifications"
         static let hasAddedPremiumAccount = "hasAddedPremiumAccount"
         static let offlineUserServerMap = "offlineUserServerMap"
+        static let customYggdrasilServers = "customYggdrasilServers"
 
         static let aiProvider = "aiProvider"
         static let aiOllamaBaseURL = "aiOllamaBaseURL"
@@ -62,6 +63,7 @@ enum AppConstants {
     enum KeychainKeys {
         static let apiKey = "apiKey"
         static let authCredential = "authCredential"
+        static let thirdPartyCredential = "thirdPartyCredential"
     }
 
     /// The Minecraft client ID, decrypted at launch.

@@ -47,6 +47,9 @@ enum CommonYggdrasilProfileListParser {
 
         if let list = try? JSONDecoder().decode([Item].self, from: data) {
             items = list
+        } else if let single = try? JSONDecoder().decode(Item.self, from: data) {
+            // Session-server profile endpoint returns a single object, not an array.
+            items = [single]
         } else if let wrapper = try? JSONDecoder().decode(ProfileListWrapper.self, from: data), !wrapper.data.isEmpty {
             items = wrapper.data
         } else {

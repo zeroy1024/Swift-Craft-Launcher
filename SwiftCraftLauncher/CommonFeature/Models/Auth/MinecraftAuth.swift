@@ -11,6 +11,7 @@ struct AuthorizationCodeResponse {
     let code: String?
     let error: String?
     let errorDescription: String?
+    let state: String?
 
     var isSuccess: Bool {
         code != nil && error == nil
@@ -25,6 +26,7 @@ struct AuthorizationCodeResponse {
               let queryItems = components.queryItems else { return nil }
         code = queryItems.first { $0.name == "code" }?.value
         error = queryItems.first { $0.name == "error" }?.value
+        state = queryItems.first { $0.name == "state" }?.value
         if let encodedDescription = queryItems.first(where: { $0.name == "error_description" })?.value {
             errorDescription = encodedDescription.removingPercentEncoding
         } else {
@@ -36,10 +38,26 @@ struct AuthorizationCodeResponse {
 struct TokenResponse: Codable {
     let accessToken: String
     let refreshToken: String?
+    let expiresIn: TimeInterval?
+    let refreshTokenExpiresIn: TimeInterval?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
+        case expiresIn = "expires_in"
+        case refreshTokenExpiresIn = "refresh_token_expires_in"
+    }
+
+    init(
+        accessToken: String,
+        refreshToken: String?,
+        expiresIn: TimeInterval? = nil,
+        refreshTokenExpiresIn: TimeInterval? = nil,
+    ) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.expiresIn = expiresIn
+        self.refreshTokenExpiresIn = refreshTokenExpiresIn
     }
 }
 

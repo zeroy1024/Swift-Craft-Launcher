@@ -154,4 +154,110 @@ final class OfflineUserServerMapTests: XCTestCase {
         XCTAssertEqual(OfflineUserServerMap.serverKey(for: ""), profile)
         OfflineUserServerMap.removeServer(for: "")
     }
+
+    func testSetServer_stripsCredentialsFromUserDefaultsAndRestoresFromKeychain() {
+        let userId = "keychain-round-trip-\(UUID().uuidString)"
+        let profile = makeProfile(id: userId, serverBaseURL: "https://littleskin.cn")
+        XCTAssertTrue(OfflineUserServerMap.setServer(profile))
+
+        // UserDefaults copy must not keep tokens.
+        let defaultsData = UserDefaults.standard.data(forKey: AppConstants.UserDefaultsKeys.offlineUserServerMap)
+        XCTAssertNotNil(defaultsData)
+        if let defaultsData,
+           let map = try? JSONDecoder().decode([String: YggdrasilProfile].self, from: defaultsData),
+           let stored = map[userId] {
+            XCTAssertEqual(stored.accessToken, "")
+            XCTAssertEqual(stored.refreshToken, "")
+            XCTAssertEqual(stored.clientToken, "")
+        } else {
+            XCTFail("Expected stripped profile in UserDefaults")
+        }
+
+        // Public API reconstructs full credentials from Keychain.
+        let restored = OfflineUserServerMap.serverKey(for: userId)
+        XCTAssertEqual(restored?.accessToken, profile.accessToken)
+        XCTAssertEqual(restored?.refreshToken, profile.refreshToken)
+
+        OfflineUserServerMap.removeServer(for: userId)
+        XCTAssertNil(OfflineUserServerMap.serverKey(for: userId))
+    }
+
+    func testSetServer_passwordAuthMethod_roundTrip() {
+        let userId = "password-auth-\(UUID().uuidString)"
+        let profile = YggdrasilProfile(
+            id: userId,
+            name: "PwdPlayer",
+            skins: [],
+            capes: nil,
+            accessToken: "access-\(userId)",
+            refreshToken: "",
+            serverBaseURL: "https://littleskin.cn",
+            authMethod: .password,
+            clientToken: "client-\(userId)",
+        )
+        XCTAssertTrue(OfflineUserServerMap.setServer(profile))
+        let restored = OfflineUserServerMap.serverKey(for: userId)
+        XCTAssertEqual(restored?.authMethod, .password)
+        XCTAssertEqual(restored?.clientToken, "client-\(userId)")
+        XCTAssertEqual(restored?.accessToken, "access-\(userId)")
+        OfflineUserServerMap.removeServer(for: userId)
+    }
+
+    func testSetServer_rememberedPassword_staysInKeychainOnly() {
+        let userId = "remember-password-\(UUID().uuidString)"
+        let profile = YggdrasilProfile(
+            id: userId,
+            name: "PwdPlayer",
+            skins: [],
+            capes: nil,
+            accessToken: "access-\(userId)",
+            refreshToken: "",
+            serverBaseURL: "https://littleskin.cn",
+            authMethod: .password,
+            clientToken: "client-\(userId)",
+            loginUsername: "user@example.com",
+            loginPassword: "secret-password",
+        )
+        XCTAssertTrue(OfflineUserServerMap.setServer(profile))
+
+        let defaultsData = UserDefaults.standard.data(forKey: AppConstants.UserDefaultsKeys.offlineUserServerMap)
+        XCTAssertNotNil(defaultsData)
+        if let defaultsData,
+           let map = try? JSONDecoder().decode([String: YggdrasilProfile].self, from: defaultsData),
+           let stored = map[userId] {
+            XCTAssertEqual(stored.loginUsername, "")
+            XCTAssertEqual(stored.loginPassword, "")
+            XCTAssertEqual(stored.accessToken, "")
+        } else {
+            XCTFail("Expected stripped profile in UserDefaults")
+        }
+
+        let restored = OfflineUserServerMap.serverKey(for: userId)
+        XCTAssertEqual(restored?.loginUsername, "user@example.com")
+        XCTAssertEqual(restored?.loginPassword, "secret-password")
+        XCTAssertEqual(restored?.authMethod, .password)
+
+        OfflineUserServerMap.removeServer(for: userId)
+        XCTAssertNil(OfflineUserServerMap.serverKey(for: userId))
+    }
+
+    func testSetServer_withoutRememberPassword_doesNotPersistLoginSecrets() {
+        let userId = "no-remember-\(UUID().uuidString)"
+        let profile = YggdrasilProfile(
+            id: userId,
+            name: "PwdPlayer",
+            skins: [],
+            capes: nil,
+            accessToken: "access-\(userId)",
+            refreshToken: "",
+            serverBaseURL: "https://littleskin.cn",
+            authMethod: .password,
+            clientToken: "client-\(userId)",
+        )
+        XCTAssertTrue(OfflineUserServerMap.setServer(profile))
+        let restored = OfflineUserServerMap.serverKey(for: userId)
+        XCTAssertEqual(restored?.loginUsername, "")
+        XCTAssertEqual(restored?.loginPassword, "")
+        OfflineUserServerMap.removeServer(for: userId)
+    }
 }

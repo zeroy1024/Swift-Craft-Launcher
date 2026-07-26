@@ -24,6 +24,8 @@ enum KeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: "\(account).\(key)",
             kSecValueData as String: data,
+            // Prefer device-local storage that is available only while the Mac is unlocked.
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
 
         SecItemDelete(query as CFDictionary)

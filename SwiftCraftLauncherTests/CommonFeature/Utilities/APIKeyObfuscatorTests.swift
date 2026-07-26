@@ -31,4 +31,14 @@ final class APIKeyObfuscatorTests: XCTestCase {
         let input = String(repeating: "A", count: 64)
         _ = Obfuscator.decryptAPIKey(input)
     }
+
+    func testDecryptAPIKey_nonMultipleOfPartLength() {
+        // Previously crashed: last chunk shorter than partLength used unbounded index offset.
+        let input = String(repeating: "A", count: 50)
+        _ = Obfuscator.decryptAPIKey(input)
+    }
+
+    func testDecryptAPIKey_emptyString() {
+        XCTAssertEqual(Obfuscator.decryptAPIKey(""), "")
+    }
 }

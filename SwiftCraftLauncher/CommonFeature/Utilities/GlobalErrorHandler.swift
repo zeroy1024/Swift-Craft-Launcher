@@ -155,10 +155,18 @@ extension GlobalError {
     static func authentication(
         i18nKey: String,
         level: ErrorLevel = .popup,
+        statusCode: Int? = nil,
         message: String? = nil,
         source: ErrorSource = .main,
     ) -> GlobalError {
-        GlobalError(kind: .authentication, i18nKey: i18nKey, level: level, message: message, source: source)
+        GlobalError(
+            kind: .authentication,
+            i18nKey: i18nKey,
+            level: level,
+            statusCode: statusCode,
+            message: message,
+            source: source,
+        )
     }
 
     static func validation(

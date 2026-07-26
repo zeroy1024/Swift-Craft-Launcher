@@ -23,6 +23,8 @@ enum YggdrasilServerPresets {
             scope: "Yggdrasil.MinecraftToken.Create Yggdrasil.PlayerProfiles.Read",
             parserId: .littleskin,
             token: "/api/yggdrasil/authserver/oauth",
+            supportedAuthMethods: [.oauth2, .password],
+            authserverPath: "/api/yggdrasil/authserver",
         ),
         YggdrasilServerConfig(
             name: "Mua",
@@ -37,6 +39,8 @@ enum YggdrasilServerPresets {
             scope: "Player.Read User.Read",
             parserId: .mua,
             token: "/api/yggdrasil/authserver/oauth",
+            supportedAuthMethods: [.oauth2, .password],
+            authserverPath: "/api/yggdrasil/authserver",
         ),
         YggdrasilServerConfig(
             name: "Ely.By",

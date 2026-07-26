@@ -25,14 +25,15 @@ final class YggdrasilAuthService {
     var authenticatedProfiles: [YggdrasilProfile] = []
 
     private let webAuthenticator = WebAuthenticator()
+    private var expectedState: String?
 
     /// Sets the Yggdrasil server to use for authentication.
     func setServer(_ config: YggdrasilServerConfig) {
+        webAuthenticator.cancel()
         currentServer = config
         authenticatedProfiles = []
-        if case .authenticated = authState {
-            authState = .idle
-        }
+        expectedState = nil
+        authState = .idle
     }
 
     /// Selects a player profile from the authenticated profiles list.
@@ -53,13 +54,15 @@ final class YggdrasilAuthService {
             return
         }
 
-        guard let authURL = buildAuthorizationURL(for: server) else {
+        let state = UUID().uuidString
+        guard let authURL = buildAuthorizationURL(for: server, state: state) else {
             authState = .error("yggdrasil.error.build_authorize_url_failed".localized())
             return
         }
 
         isLoading = true
         authState = .waitingForBrowser
+        expectedState = state
 
         await withCheckedContinuation { continuation in
             self.webAuthenticator.start(
@@ -99,6 +102,12 @@ final class YggdrasilAuthService {
                         return
                     }
 
+                    guard authResponse.state == self.expectedState else {
+                        AppLog.common.error("Yggdrasil callback state did not match the active login")
+                        finish(.error("yggdrasil.error.invalid_callback_url".localized()))
+                        return
+                    }
+
                     if authResponse.isUserDenied {
                         AppLog.common.info("User denied Yggdrasil authorization")
                         finish(.idle)
@@ -130,13 +139,14 @@ final class YggdrasilAuthService {
         authState = .idle
         isLoading = false
         webAuthenticator.cancel()
+        expectedState = nil
         currentServer = nil
         authenticatedProfiles = []
     }
 }
 
 private extension YggdrasilAuthService {
-    func buildAuthorizationURL(for server: YggdrasilServerConfig) -> URL? {
+    func buildAuthorizationURL(for server: YggdrasilServerConfig, state: String) -> URL? {
         guard let authorizeURL = server.authorizeURL,
               var components = URLComponents(url: authorizeURL, resolvingAgainstBaseURL: false) else {
             return nil
@@ -145,6 +155,7 @@ private extension YggdrasilAuthService {
         var items: [URLQueryItem] = [
             URLQueryItem(name: "redirect_uri", value: server.redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "state", value: state),
         ]
 
         if let clientId = server.clientId {
@@ -195,6 +206,7 @@ private extension YggdrasilAuthService {
                     accessToken: accessToken,
                     refreshToken: refreshToken,
                     serverBaseURL: server.baseURL.absoluteString,
+                    accessTokenExpiresAt: token.expiresIn.map { Date().addingTimeInterval($0) },
                 )
             }
 

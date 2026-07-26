@@ -34,6 +34,7 @@ struct MinecraftAuthView: View {
                 errorView(message: message)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding()
         .onDisappear {
             clearAllData()

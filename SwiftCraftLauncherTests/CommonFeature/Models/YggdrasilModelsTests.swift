@@ -16,13 +16,14 @@ final class YggdrasilModelsTests: XCTestCase {
     }
 
     func testParserID_allCases() {
-        XCTAssertEqual(YggdrasilProfileParserID.allCases.count, 3)
+        XCTAssertEqual(YggdrasilProfileParserID.allCases.count, 4)
     }
 
     func testParserID_id() {
         XCTAssertEqual(YggdrasilProfileParserID.littleskin.id, "littleskin")
         XCTAssertEqual(YggdrasilProfileParserID.mua.id, "mua")
         XCTAssertEqual(YggdrasilProfileParserID.ely.id, "ely")
+        XCTAssertEqual(YggdrasilProfileParserID.authlib.id, "authlib")
     }
 
     func testParserID_codable_roundTrip() throws {

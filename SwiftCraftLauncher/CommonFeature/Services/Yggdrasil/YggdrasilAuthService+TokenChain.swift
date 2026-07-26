@@ -26,14 +26,14 @@ extension YggdrasilAuthService {
         return try await OAuth2TokenOperations.exchangeCode(
             code: code,
             tokenURL: tokenURL,
-            clientId: server.clientId ?? "",
+            clientId: server.clientId,
             redirectURI: server.redirectURI,
             scope: server.scope.isEmpty ? nil : server.scope,
             additionalParameters: additionalParams,
         )
     }
 
-    private func refreshToken(refreshToken: String, server: YggdrasilServerConfig) async throws -> TokenResponse {
+    private func refreshOAuthToken(refreshToken: String, server: YggdrasilServerConfig) async throws -> TokenResponse {
         guard let refreshTokenURL = server.tokenURL else {
             throw GlobalError.validation(
                 i18nKey: "error.validation.yggdrasil_refresh_token_url_invalid",
@@ -52,7 +52,7 @@ extension YggdrasilAuthService {
         let result = try await OAuth2TokenOperations.refreshToken(
             refreshToken: refreshToken,
             tokenURL: refreshTokenURL,
-            clientId: server.clientId ?? "",
+            clientId: server.clientId,
             additionalParameters: additionalParams,
         )
         AppLog.common.info("Token refreshed successfully for server \(server.name)")
@@ -93,10 +93,23 @@ extension YggdrasilAuthService {
         )
     }
 
-    func refreshThirdPartyToken(profile: YggdrasilProfile, server: YggdrasilServerConfig) async {
-        var updatedProfile = profile
-        do {
-            let tokenResponse = try await refreshToken(
+    func refreshThirdPartyToken(profile: YggdrasilProfile, server: YggdrasilServerConfig) async throws -> YggdrasilProfile {
+        if let expiresAt = profile.accessTokenExpiresAt,
+           expiresAt.timeIntervalSinceNow > 300 {
+            return profile
+        }
+
+        let updatedProfile: YggdrasilProfile
+        switch profile.authMethod {
+        case .oauth2:
+            guard !profile.refreshToken.isEmpty else {
+                throw GlobalError.authentication(
+                    i18nKey: "error.authentication.reauth_required",
+                    level: .popup,
+                    message: "Missing refresh token for Yggdrasil OAuth profile \(profile.id)",
+                )
+            }
+            let tokenResponse = try await refreshOAuthToken(
                 refreshToken: profile.refreshToken,
                 server: server,
             )
@@ -108,15 +121,58 @@ extension YggdrasilAuthService {
                 accessToken: tokenResponse.accessToken,
                 refreshToken: tokenResponse.refreshToken ?? profile.refreshToken,
                 serverBaseURL: profile.serverBaseURL,
+                authMethod: .oauth2,
+                accessTokenExpiresAt: tokenResponse.expiresIn.map { Date().addingTimeInterval($0) },
             )
-        } catch {
-            DIContainer.shared.core.errorHandler.handle(error)
+        case .password:
+            do {
+                updatedProfile = try await refreshPasswordToken(profile: profile, server: server)
+            } catch {
+                // Only fall back for likely credential/token problems. Transient network/5xx should surface as-is.
+                guard shouldAttemptRememberedPasswordReauth(after: error),
+                      !profile.loginUsername.isEmpty,
+                      !profile.loginPassword.isEmpty else {
+                    throw error
+                }
+                AppLog.common.info(
+                    "Password-token refresh failed for \(profile.id); trying remembered password re-auth",
+                )
+                do {
+                    updatedProfile = try await reauthenticateWithRememberedPassword(
+                        profile: profile,
+                        server: server,
+                    )
+                } catch {
+                    // Keep remembered password on transient failures; clear only on confirmed auth rejection.
+                    if isYggdrasilCredentialInvalidationError(error) {
+                        let cleared = invalidatedPasswordCredentialProfile(from: profile)
+                        _ = OfflineUserServerMap.setServer(cleared)
+                        throw GlobalError.authentication(
+                            i18nKey: "error.authentication.reauth_required",
+                            level: .popup,
+                            statusCode: (error as? GlobalError)?.statusCode,
+                            message: "Remembered password re-auth failed for \(profile.id): \(error.localizedDescription)",
+                        )
+                    }
+                    throw error
+                }
+            }
         }
 
-        OfflineUserServerMap.setServer(updatedProfile)
+        guard OfflineUserServerMap.setServer(updatedProfile) else {
+            throw GlobalError.authentication(
+                i18nKey: "error.authentication.reauth_required",
+                level: .popup,
+                message: "Failed to persist refreshed third-party credential for \(profile.id)",
+            )
+        }
+        return updatedProfile
     }
 
     func getMinecraftToken(profile: YggdrasilProfile, server: YggdrasilServerConfig) async throws -> String {
+        if profile.authMethod == .password {
+            return profile.accessToken
+        }
         guard let parser = YggdrasilMinecraftTokenParsers.make(for: server.parserId) else {
             AppLog.common.error("TODO: Minecraft token fetch not yet implemented for this server (\(server.name)), falling back to OAuth2 token")
             return profile.accessToken

@@ -49,12 +49,21 @@ enum Obfuscator {
     static func decryptAPIKey(_ encryptedString: String) -> String {
         let partLength = 8
         let totalLength = encryptedString.count
-        let numParts = (totalLength + partLength - 1) / partLength
+        let numParts = totalLength == 0 ? 0 : (totalLength + partLength - 1) / partLength
 
         var parts: [String] = []
         for i in 0 ..< numParts {
-            let startIndex = encryptedString.index(encryptedString.startIndex, offsetBy: i * partLength)
-            let endIndex = min(encryptedString.index(startIndex, offsetBy: partLength), encryptedString.endIndex)
+            let startOffset = i * partLength
+            guard startOffset < totalLength else {
+                parts.append("")
+                continue
+            }
+            let startIndex = encryptedString.index(encryptedString.startIndex, offsetBy: startOffset)
+            let endIndex = encryptedString.index(
+                startIndex,
+                offsetBy: partLength,
+                limitedBy: encryptedString.endIndex,
+            ) ?? encryptedString.endIndex
             let part = String(encryptedString[startIndex ..< endIndex])
             parts.append(part)
         }

@@ -19,6 +19,8 @@ final class ConstantsAndPresetsTests: XCTestCase {
         XCTAssertEqual(littleSkin?.clientId, "1181")
         XCTAssertEqual(littleSkin?.parserId, .littleskin)
         XCTAssertEqual(littleSkin?.scope, "Yggdrasil.MinecraftToken.Create Yggdrasil.PlayerProfiles.Read")
+        XCTAssertEqual(littleSkin?.supportedAuthMethods, [.oauth2, .password])
+        XCTAssertEqual(littleSkin?.authserverURL?.absoluteString, "https://littleskin.cn/api/yggdrasil/authserver")
     }
 
     func testYggdrasilServerPresets_mua() {
@@ -26,6 +28,7 @@ final class ConstantsAndPresetsTests: XCTestCase {
         XCTAssertNotNil(mua)
         XCTAssertEqual(mua?.clientId, "34")
         XCTAssertEqual(mua?.parserId, .mua)
+        XCTAssertEqual(mua?.supportedAuthMethods, [.oauth2, .password])
     }
 
     func testYggdrasilServerPresets_ely() {
@@ -33,6 +36,8 @@ final class ConstantsAndPresetsTests: XCTestCase {
         XCTAssertNotNil(ely)
         XCTAssertEqual(ely?.clientId, "swift-craft-launcher")
         XCTAssertEqual(ely?.parserId, .ely)
+        XCTAssertEqual(ely?.supportedAuthMethods, [.oauth2])
+        XCTAssertNil(ely?.authserverURL)
     }
 
     func testYggdrasilServerPresets_allHaveRedirectURI() {
@@ -58,6 +63,8 @@ final class ConstantsAndPresetsTests: XCTestCase {
                 scope: "Yggdrasil.MinecraftToken.Create Yggdrasil.PlayerProfiles.Read",
                 parserId: .littleskin,
                 token: "/api/yggdrasil/authserver/oauth",
+                supportedAuthMethods: [.oauth2, .password],
+                authserverPath: "/api/yggdrasil/authserver",
             ),
             YggdrasilServerConfig(
                 name: "Mua",
@@ -71,6 +78,8 @@ final class ConstantsAndPresetsTests: XCTestCase {
                 scope: "Player.Read User.Read",
                 parserId: .mua,
                 token: "/api/yggdrasil/authserver/oauth",
+                supportedAuthMethods: [.oauth2, .password],
+                authserverPath: "/api/yggdrasil/authserver",
             ),
             YggdrasilServerConfig(
                 name: "Ely.By",
@@ -89,13 +98,14 @@ final class ConstantsAndPresetsTests: XCTestCase {
     }
 
     func testYggdrasilProfileParserID_allCases() {
-        XCTAssertEqual(YggdrasilProfileParserID.allCases.count, 3)
+        XCTAssertEqual(YggdrasilProfileParserID.allCases.count, 4)
     }
 
     func testYggdrasilProfileParserID_rawValues() {
         XCTAssertEqual(YggdrasilProfileParserID.littleskin.rawValue, "littleskin")
         XCTAssertEqual(YggdrasilProfileParserID.mua.rawValue, "mua")
         XCTAssertEqual(YggdrasilProfileParserID.ely.rawValue, "ely")
+        XCTAssertEqual(YggdrasilProfileParserID.authlib.rawValue, "authlib")
     }
 
     func testMinecraftSkinConstants_values() {

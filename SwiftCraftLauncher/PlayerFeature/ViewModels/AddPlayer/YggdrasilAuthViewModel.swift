@@ -22,6 +22,8 @@ final class YggdrasilAuthViewModel {
     func onSelectedOptionChanged(_ option: YggdrasilServerConfig?, authService: YggdrasilAuthService) {
         if let option {
             authService.setServer(option)
+        } else {
+            authService.logout()
         }
     }
 

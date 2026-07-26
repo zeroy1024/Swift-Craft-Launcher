@@ -27,6 +27,10 @@ struct AddPlayerSheetView: View {
     @State private var isPremium: Bool = false
     @State private var authenticatedProfile: MinecraftProfileResponse?
     @State private var viewModel = AddPlayerSheetViewModel()
+    @State private var thirdPartyAuthMethod: ThirdPartyAuthMethod = .oauth2
+    @State private var thirdPartyUsername: String = ""
+    @State private var thirdPartyPassword: String = ""
+    @State private var thirdPartyRememberPassword: Bool = false
 
     @Environment(\.openURL)
     private var openURL
@@ -81,18 +85,13 @@ struct AddPlayerSheetView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             },
             body: {
-                switch viewModel.selectedAuthType {
-                case .premium:
-                    MinecraftAuthView(onLoginSuccess: onLogin)
-                case .yggdrasil:
-                    YggdrasilAuthView(onLoginSuccess: onYggdrasilLogin)
-                case .offline:
-                    VStack(alignment: .leading) {
-                        playerInfoSection
-                            .padding(.bottom, 10)
-                        playerNameInputSection
-                    }
+                // Keep sheet height stable across Microsoft / third-party / offline modes.
+                ScrollView {
+                    authBodyContent
+                        .frame(maxWidth: .infinity, minHeight: Self.bodyContentHeight, alignment: .topLeading)
                 }
+                .frame(height: Self.bodyContentHeight)
+                .scrollIndicators(.automatic)
             },
             footer: {
                 HStack {
@@ -136,13 +135,23 @@ struct AddPlayerSheetView: View {
                         case .idle, .error:
                             Button("addplayer.auth.start_login".localized()) {
                                 Task {
-                                    await viewModel.startYggdrasilAuthentication(
-                                        yggdrasilAuthService: container.system.yggdrasilAuthService,
-                                    )
+                                    switch thirdPartyAuthMethod {
+                                    case .oauth2:
+                                        await viewModel.startYggdrasilAuthentication(
+                                            yggdrasilAuthService: container.system.yggdrasilAuthService,
+                                        )
+                                    case .password:
+                                        await container.system.yggdrasilAuthService.startPasswordAuthentication(
+                                            username: thirdPartyUsername,
+                                            password: thirdPartyPassword,
+                                            rememberPassword: thirdPartyRememberPassword,
+                                        )
+                                        thirdPartyPassword = ""
+                                    }
                                 }
                             }
                             .keyboardShortcut(.defaultAction)
-                            .disabled(container.system.yggdrasilAuthService.currentServer == nil)
+                            .disabled(!canStartThirdPartyLogin)
                         case let .authenticated(profile):
                             Button("addplayer.auth.add".localized()) {
                                 onYggdrasilLogin?(profile)
@@ -172,6 +181,7 @@ struct AddPlayerSheetView: View {
                 }
             },
         )
+        .frame(width: 520)
         .task {
             await viewModel.checkPremiumAccountFlag()
         }
@@ -193,6 +203,31 @@ struct AddPlayerSheetView: View {
         .fixedSize()
     }
 
+    /// Fixed body height so switching auth types does not resize the sheet.
+    private static let bodyContentHeight: CGFloat = 240
+
+    @ViewBuilder private var authBodyContent: some View {
+        switch viewModel.selectedAuthType {
+        case .premium:
+            MinecraftAuthView(onLoginSuccess: onLogin)
+        case .yggdrasil:
+            YggdrasilAuthView(
+                authMethod: $thirdPartyAuthMethod,
+                username: $thirdPartyUsername,
+                password: $thirdPartyPassword,
+                rememberPassword: $thirdPartyRememberPassword,
+                onLoginSuccess: onYggdrasilLogin,
+            )
+        case .offline:
+            VStack(alignment: .leading) {
+                playerInfoSection
+                    .padding(.bottom, 10)
+                playerNameInputSection
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     /// Clears all data and resets authentication state when the sheet is dismissed.
     private func clearAllData() {
         playerName = ""
@@ -203,7 +238,20 @@ struct AddPlayerSheetView: View {
         isTextFieldFocused = false
         showErrorPopover = false
         container.system.yggdrasilAuthService.logout()
+        thirdPartyAuthMethod = .oauth2
+        thirdPartyUsername = ""
+        thirdPartyPassword = ""
+        thirdPartyRememberPassword = false
         viewModel.reset()
+    }
+
+    private var canStartThirdPartyLogin: Bool {
+        guard container.system.yggdrasilAuthService.currentServer != nil else { return false }
+        if thirdPartyAuthMethod == .password {
+            return !thirdPartyUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !thirdPartyPassword.isEmpty
+        }
+        return true
     }
 
     private var playerInfoSection: some View {

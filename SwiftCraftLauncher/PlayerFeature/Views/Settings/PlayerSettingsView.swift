@@ -17,7 +17,7 @@ public struct PlayerSettingsView: View {
     @State private var viewModel = PlayerSettingsViewModel()
     @Environment(PlayerListViewModel.self)
     private var playerListViewModel
-    private let yggdrasilServers = YggdrasilServerPresets.servers
+    private var yggdrasilServers: [YggdrasilServerConfig] { YggdrasilServerRegistry.allServers }
 
     private var currentPlayer: Player? {
         playerListViewModel.currentPlayer

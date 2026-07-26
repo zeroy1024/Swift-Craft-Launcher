@@ -14,7 +14,7 @@ struct CommonYggdrasilProfileParserProvider: YggdrasilProfileParserProvider {
         baseURL: String,
     ) -> (any YggdrasilProfileListParser)? {
         switch id {
-        case .littleskin:
+        case .littleskin, .authlib:
             return CommonYggdrasilStyleProfileListParser(baseURL: baseURL)
         case .mua:
             return CommonBlessingSkinStyleProfileListParser(baseURL: baseURL)
